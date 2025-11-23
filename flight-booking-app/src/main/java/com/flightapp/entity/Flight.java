@@ -43,4 +43,6 @@ public class Flight {
 
     @Min(5)
     private int totalSeats;
+    
+    private int availableSeats;
 }
