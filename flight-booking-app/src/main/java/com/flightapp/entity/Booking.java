@@ -18,9 +18,9 @@ import lombok.Data;
 public class Booking {
 
 	@Id
+	private String id;
 	private String flightNumber;
 
-	@NotBlank(message = "PNR is required")
 	private String pnr;
 
 	@NotBlank(message = "Email is required")

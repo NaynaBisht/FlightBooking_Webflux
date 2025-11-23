@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import com.flightapp.entity.Booking;
 import com.flightapp.entity.Flight;
 import com.flightapp.entity.Passenger;
+import com.flightapp.enums.Gender;
+import com.flightapp.enums.MealPreference;
 import com.flightapp.repository.BookingRepository;
 import com.flightapp.repository.FlightRepository;
 import com.flightapp.request.BookingRequest;
@@ -51,12 +53,12 @@ public class BookingService {
                     float totalPrice = (price + tax) * request.getNumberOfSeats();
 
                     Booking booking = new Booking();
+                    booking.setFlightNumber(flightNumber);
                     booking.setPnr(pnrGeneratorService.generatePnr());
                     booking.setEmailId(request.getEmailId());
                     booking.setContactNumber(request.getContactNumber());
                     booking.setBookingTimestamp(LocalDateTime.now());
                     booking.setNumberOfSeats(request.getNumberOfSeats());
-                    booking.setFlightNumber(flightNumber);
                     booking.setPrice(price);
                     booking.setTotalPrice(totalPrice);
                     booking.setPassengers(
@@ -87,9 +89,21 @@ public class BookingService {
         Passenger p = new Passenger();
         p.setPassengerName(req.getPassengerName());
         p.setAge(req.getAge());
-        p.setGender(req.getGender());
+
+        try {
+            p.setGender(Gender.valueOf(req.getGender().toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid gender value: " + req.getGender());
+        }
+
         p.setSeatNum(req.getSeatNum());
-        p.setMealPref(req.getMealPref());
+
+        try {
+            p.setMealPref(MealPreference.valueOf(req.getMealPref().toUpperCase().replace("-", "_")));
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid meal preference: " + req.getMealPref());
+        }
+
         return p;
     }
 
