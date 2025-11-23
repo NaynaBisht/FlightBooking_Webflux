@@ -1,7 +1,7 @@
 package com.flightapp.controller;
 
 import java.util.Collections;
-import java.util.Map;
+import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +15,6 @@ import com.flightapp.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Slf4j
@@ -34,10 +33,14 @@ public class BookingController {
 	}
 
 	@GetMapping("/booking/history/{emailId}")
-	public Flux<Booking> getBookingHistory(@PathVariable String emailId) {
+	public Mono<ResponseEntity<List<Booking>>> getBookingHistory(@PathVariable String emailId) {
 		log.info("Fetching booking history for emailId={}", emailId);
 
-		return bookingService.getBookingHistoryByEmailId(emailId);
+		return bookingService.getBookingHistoryByEmailId(emailId).collectList()
+				.map(bookings -> ResponseEntity.ok(bookings)).onErrorResume(ex -> {
+					log.error("Error fetching booking history: {}", ex.getMessage());
+					return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.emptyList()));
+				});
 	}
 
 	@PostMapping("/booking/{flightNumber}")
