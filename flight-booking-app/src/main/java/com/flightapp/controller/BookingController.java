@@ -24,7 +24,7 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class BookingController {
 
-	private final BookingService bookingService;
+	private BookingService bookingService;
 
 	@GetMapping("/ticket/{pnr}")
 	public Mono<ResponseEntity<Booking>> getTicketDetailsByPnr(@PathVariable String pnr) {
@@ -46,31 +46,35 @@ public class BookingController {
 
 		log.info("Booking flight {} for {}", flightNumber, request.getEmailId());
 		return bookingService.bookFlight(flightNumber, request)
-		        .map(response -> ResponseEntity
-		                .status(HttpStatus.CREATED)
-		                .body(response)
-		        )
-		        .onErrorResume(ex -> {
+				.map(response -> ResponseEntity.status(HttpStatus.CREATED).body(response)).onErrorResume(ex -> {
 
-		            String message = ex.getMessage() != null ? ex.getMessage() : "Unexpected error";
+					String message = ex.getMessage() != null ? ex.getMessage() : "Unexpected error";
 
-		            if (message.contains("Flight not found")) {
-		                return Mono.just(ResponseEntity
-		                        .status(HttpStatus.NOT_FOUND)
-		                        .body(new BookingResponse(null, 0, message)));
-		            }
+					if (message.contains("Flight not found")) {
+						return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
+								.body(new BookingResponse(null, 0, message)));
+					}
 
-		            return Mono.just(ResponseEntity
-		                    .status(HttpStatus.BAD_REQUEST)
-		                    .body(new BookingResponse(null, 0, message)));
-		        });
+					return Mono.just(
+							ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new BookingResponse(null, 0, message)));
+				});
 
 	}
 
 	@DeleteMapping("/booking/cancel/{pnr}")
-	public Mono<ResponseEntity<String>> cancelBooking(@PathVariable String pnr) {
+	public Mono<ResponseEntity<Void>> cancelBooking(@PathVariable String pnr) {
 		log.warn("Cancel request received for PNR={}", pnr);
 
-		return bookingService.cancelBooking(pnr).then(Mono.just(ResponseEntity.noContent().build()));
+		return bookingService.cancelBooking(pnr).then(Mono.just(ResponseEntity.noContent().<Void>build()))
+				.onErrorResume(ex -> {
+					String message = ex.getMessage() == null ? "" : ex.getMessage();
+
+					if (message.contains("not found")) {
+						return Mono.just(ResponseEntity.notFound().<Void>build());
+					}
+
+					return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).<Void>build());
+				});
 	}
+
 }

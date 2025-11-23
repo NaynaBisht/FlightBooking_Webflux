@@ -116,13 +116,13 @@ public class BookingService {
         return bookingRepository.findByEmailId(emailId);
     }
 
-    public Mono<String> cancelBooking(String pnr) {
-        return bookingRepository.findByPnr(pnr)
-                .switchIfEmpty(Mono.error(new RuntimeException("PNR not found")))
+    public Mono<Void> cancelBooking(String pnr) {
+    	return bookingRepository.findByPnr(pnr)
+                .switchIfEmpty(Mono.error(new RuntimeException("Booking not found")))
                 .flatMap(booking -> {
                     booking.setStatus("CANCELLED");
-                    return bookingRepository.save(booking)
-                            .thenReturn("Booking cancelled successfully for PNR: " + pnr);
-                });
+                    return bookingRepository.save(booking);
+                })
+                .then();
     }
 }
