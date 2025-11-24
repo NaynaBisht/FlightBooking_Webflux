@@ -15,34 +15,34 @@ import lombok.Data;
 @Document(collection = "flights")
 public class Flight {
 
-    @Id
-    private String id;
+	@Id
+	private String id;
 
-    @NotBlank
-    private String flightNumber;
+	@NotBlank
+	private String flightNumber;
 
-    @NotBlank
-    private String airlineName;
+	@NotBlank
+	private String airlineName;
 
-    @NotBlank
-    @Pattern(regexp = "^[A-Z]{3}$", message = "Airport code must be 3 uppercase letters")
-    private String departingAirport;
+	@NotBlank
+	@Pattern(regexp = "^[A-Z]{3}$", message = "Airport code must be 3 uppercase letters")
+	private String departingAirport;
 
-    @NotBlank
-    @Pattern(regexp = "^[A-Z]{3}$", message = "Airport code must be 3 uppercase letters")
-    private String arrivalAirport;
+	@NotBlank
+	@Pattern(regexp = "^[A-Z]{3}$", message = "Airport code must be 3 uppercase letters")
+	private String arrivalAirport;
 
-    @NotNull
-    private LocalDateTime departureTime;
+	@NotNull
+	private LocalDateTime departureTime;
 
-    @NotNull
-    private LocalDateTime arrivalTime;
+	@NotNull
+	private LocalDateTime arrivalTime;
 
-    @Min(100)
-    private float price;
+	@Min(100)
+	private float price;
 
-    @Min(5)
-    private int totalSeats;
-    
-    private int availableSeats;
+	@Min(5)
+	private int totalSeats;
+
+	private int availableSeats;
 }

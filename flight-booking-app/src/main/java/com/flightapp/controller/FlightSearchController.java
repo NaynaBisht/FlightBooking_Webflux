@@ -17,35 +17,23 @@ import reactor.core.publisher.Mono;
 
 @Slf4j
 @RestController
-@RequestMapping("api/v1.0/flight")
+@RequestMapping("api/flight")
 @RequiredArgsConstructor
 public class FlightSearchController {
 
-    private final FlightService flightService;
+	private final FlightService flightService;
 
-    @PostMapping("/search")
-    public Mono<ResponseEntity<FlightSearchResponse>> searchFlights(
-            @Valid @RequestBody FlightSearchRequest request) {
+	@PostMapping("/search")
+	public Mono<ResponseEntity<FlightSearchResponse>> searchFlights(@Valid @RequestBody FlightSearchRequest request) {
 
-        log.info("Searching flights: {} -> {} on {}",
-                request.getDepartingAirport(),
-                request.getArrivalAirport(),
-                request.getDepartDate());
+		log.info("Searching flights: {} -> {} on {}", request.getDepartingAirport(), request.getArrivalAirport(),
+				request.getDepartDate());
 
-        return flightService.searchFlights(request)
-                .map(ResponseEntity::ok)
-                .switchIfEmpty(Mono.just(
-                        ResponseEntity.status(HttpStatus.NOT_FOUND)
-                                .body(new FlightSearchResponse(0, List.of(),
-                                        "No flights found for selected date and route"))
-                ))
-                .onErrorResume(ex ->
-                        Mono.just(
-                                ResponseEntity.badRequest()
-                                        .body(new FlightSearchResponse(0, List.of(),
-                                                ex.getMessage()))
-                        )
-                );
-    }
+		return flightService.searchFlights(request).map(ResponseEntity::ok)
+				.switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
+						.body(new FlightSearchResponse(0, List.of(), "No flights found for selected date and route"))))
+				.onErrorResume(ex -> Mono.just(
+						ResponseEntity.badRequest().body(new FlightSearchResponse(0, List.of(), ex.getMessage()))));
+	}
 
 }

@@ -11,6 +11,10 @@ import com.flightapp.entity.Flight;
 import com.flightapp.entity.Passenger;
 import com.flightapp.enums.Gender;
 import com.flightapp.enums.MealPreference;
+import com.flightapp.exception.BadRequestException;
+import com.flightapp.exception.PassengerValidationException;
+import com.flightapp.exception.ResourceNotFoundException;
+import com.flightapp.exception.SeatUnavailableException;
 import com.flightapp.repository.BookingRepository;
 import com.flightapp.repository.FlightRepository;
 import com.flightapp.request.BookingRequest;
@@ -27,102 +31,94 @@ import reactor.core.publisher.Flux;
 @RequiredArgsConstructor
 public class BookingService {
 
-    private final BookingRepository bookingRepository;
-    private final FlightRepository flightRepository;
-    private final PnrGeneratorService pnrGeneratorService;
-    
-    public Mono<BookingResponse> bookFlight(String flightNumber, BookingRequest request) {
+	private final BookingRepository bookingRepository;
+	private final FlightRepository flightRepository;
+	private final PnrGeneratorService pnrGeneratorService;
 
-        return flightRepository.findByFlightNumber(flightNumber)
-                .switchIfEmpty(Mono.error(new RuntimeException("Flight not found")))
-                .flatMap(flight -> {
+	public Mono<BookingResponse> bookFlight(String flightNumber, BookingRequest request) {
 
-                    log.debug("Fetched flight details: {}", flight);
+		return flightRepository.findByFlightNumber(flightNumber)
+				.switchIfEmpty(
+						Mono.error(new ResourceNotFoundException("Flight not found for number: " + flightNumber)))
+				.flatMap(flight -> {
 
-                    if (flight.getAvailableSeats() < request.getNumberOfSeats()) {
-                        return Mono.error(new RuntimeException("Insufficient seat availability"));
-                    }
+					log.debug("Fetched flight details: {}", flight);
 
-                    if (!request.getNumberOfSeats().equals(request.getPassengers().size())) {
-                        return Mono.error(new RuntimeException(
-                                "Passenger count must match number of seats booked"));
-                    }
+					if (flight.getAvailableSeats() < request.getNumberOfSeats()) {
+						throw new SeatUnavailableException("Insufficient seat availability");
+					}
 
-                    float price = flight.getPrice();
-                    float tax = price * 0.18f;
-                    float totalPrice = (price + tax) * request.getNumberOfSeats();
+					if (!request.getNumberOfSeats().equals(request.getPassengers().size())) {
+						throw new BadRequestException("Passenger count must match number of seats booked");
+					}
 
-                    Booking booking = new Booking();
-                    booking.setFlightNumber(flightNumber);
-                    booking.setPnr(pnrGeneratorService.generatePnr());
-                    booking.setEmailId(request.getEmailId());
-                    booking.setContactNumber(request.getContactNumber());
-                    booking.setBookingTimestamp(LocalDateTime.now());
-                    booking.setNumberOfSeats(request.getNumberOfSeats());
-                    booking.setPrice(price);
-                    booking.setTotalPrice(totalPrice);
-                    booking.setPassengers(
-                            request.getPassengers().stream()
-                                    .map(this::toPassenger)
-                                    .collect(Collectors.toList())
-                    );
-                    booking.setStatus("BOOKED");
+					float price = flight.getPrice();
+					float tax = price * 0.18f;
+					float totalPrice = (price + tax) * request.getNumberOfSeats();
 
-                    flight.setAvailableSeats(
-                            flight.getAvailableSeats() - request.getNumberOfSeats()
-                    );
+					Booking booking = new Booking();
+					booking.setFlightNumber(flightNumber);
+					booking.setPnr(pnrGeneratorService.generatePnr());
+					booking.setEmailId(request.getEmailId());
+					booking.setContactNumber(request.getContactNumber());
+					booking.setBookingTimestamp(LocalDateTime.now());
+					booking.setNumberOfSeats(request.getNumberOfSeats());
+					booking.setPrice(price);
+					booking.setTotalPrice(totalPrice);
+					booking.setPassengers(
+							request.getPassengers().stream().map(this::toPassenger).collect(Collectors.toList()));
+					booking.setStatus("BOOKED");
 
-                    return bookingRepository.save(booking)
-                            .flatMap(savedBooking -> flightRepository.save(flight)
-                                    .thenReturn(savedBooking))
-                            .map(savedBooking -> {
-                                BookingResponse response = new BookingResponse();
-                                response.setPnr(savedBooking.getPnr());
-                                response.setTotalPrice(savedBooking.getTotalPrice());
-                                response.setMessage("You have successfully booked the flight");
-                                return response;
-                            });
-                });
-    }
+					flight.setAvailableSeats(flight.getAvailableSeats() - request.getNumberOfSeats());
 
-    private Passenger toPassenger(PassengerRequest req) {
-        Passenger p = new Passenger();
-        p.setPassengerName(req.getPassengerName());
-        p.setAge(req.getAge());
+					return bookingRepository.save(booking)
+							.flatMap(savedBooking -> flightRepository.save(flight).thenReturn(savedBooking))
+							.map(savedBooking -> {
+								BookingResponse response = new BookingResponse();
+								response.setPnr(savedBooking.getPnr());
+								response.setTotalPrice(savedBooking.getTotalPrice());
+								response.setMessage("You have successfully booked the flight");
+								return response;
+							});
+				});
+	}
 
-        try {
-            p.setGender(Gender.valueOf(req.getGender().toUpperCase()));
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid gender value: " + req.getGender());
-        }
+	private Passenger toPassenger(PassengerRequest req) {
+		Passenger p = new Passenger();
+		p.setPassengerName(req.getPassengerName());
+		p.setAge(req.getAge());
 
-        p.setSeatNum(req.getSeatNum());
+		try {
+			p.setGender(Gender.valueOf(req.getGender().toUpperCase()));
+		} catch (IllegalArgumentException e) {
+			throw new PassengerValidationException("Invalid gender value: " + req.getGender());
+		}
 
-        try {
-            p.setMealPref(MealPreference.valueOf(req.getMealPref().toUpperCase().replace("-", "_")));
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid meal preference: " + req.getMealPref());
-        }
+		p.setSeatNum(req.getSeatNum());
 
-        return p;
-    }
+		try {
+			p.setMealPref(MealPreference.valueOf(req.getMealPref().toUpperCase().replace("-", "_")));
+		} catch (IllegalArgumentException e) {
+			throw new PassengerValidationException("Invalid meal preference: " + req.getMealPref());
+		}
 
-    public Mono<Booking> getBookingByPnr(String pnr) {
-        return bookingRepository.findByPnr(pnr)
-                .switchIfEmpty(Mono.error(new RuntimeException("Booking not found for PNR: " + pnr)));
-    }
+		return p;
+	}
 
-    public Flux<Booking> getBookingHistoryByEmailId(String emailId) {
-        return bookingRepository.findByEmailId(emailId);
-    }
+	public Mono<Booking> getBookingByPnr(String pnr) {
+		return bookingRepository.findByPnr(pnr)
+				.switchIfEmpty(Mono.error(new ResourceNotFoundException("Booking not found for PNR: " + pnr)));
+	}
 
-    public Mono<Void> cancelBooking(String pnr) {
-    	return bookingRepository.findByPnr(pnr)
-                .switchIfEmpty(Mono.error(new RuntimeException("Booking not found")))
-                .flatMap(booking -> {
-                    booking.setStatus("CANCELLED");
-                    return bookingRepository.save(booking);
-                })
-                .then();
-    }
+	public Flux<Booking> getBookingHistoryByEmailId(String emailId) {
+		return bookingRepository.findByEmailId(emailId);
+	}
+
+	public Mono<Void> cancelBooking(String pnr) {
+		return bookingRepository.findByPnr(pnr)
+				.switchIfEmpty(Mono.error(new ResourceNotFoundException("Booking not found"))).flatMap(booking -> {
+					booking.setStatus("CANCELLED");
+					return bookingRepository.save(booking);
+				}).then();
+	}
 }

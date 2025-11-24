@@ -19,30 +19,27 @@ import reactor.core.publisher.Mono;
 
 @Slf4j
 @RestController
-@RequestMapping("api/v1.0/flight")
+@RequestMapping("api/flight")
 @RequiredArgsConstructor
 public class BookingController {
 
-	private BookingService bookingService;
+	private final BookingService bookingService;
 
 	@GetMapping("/ticket/{pnr}")
 	public Mono<ResponseEntity<Booking>> getTicketDetailsByPnr(@PathVariable String pnr) {
-	    log.info("Fetching ticket details for PNR={}", pnr);
+		log.info("Fetching ticket details for PNR={}", pnr);
 
-	    return bookingService.getBookingByPnr(pnr)
-	            .map(ResponseEntity::ok)
-	            .onErrorResume(ex -> {
-	                log.error("Error fetching ticket for PNR {}: {}", pnr, ex.getMessage());
-	                String msg = ex.getMessage() == null ? "" : ex.getMessage();
+		return bookingService.getBookingByPnr(pnr).map(ResponseEntity::ok).onErrorResume(ex -> {
+			log.error("Error fetching ticket for PNR {}: {}", pnr, ex.getMessage());
+			String msg = ex.getMessage() == null ? "" : ex.getMessage();
 
-	                if (msg.contains("not found")) {
-	                    return Mono.just(ResponseEntity.notFound().build()); // 404
-	                }
+			if (msg.contains("not found")) {
+				return Mono.just(ResponseEntity.notFound().build()); // 404
+			}
 
-	                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
-	            });
+			return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build());
+		});
 	}
-
 
 	@GetMapping("/booking/history/{emailId}")
 	public Mono<ResponseEntity<List<Booking>>> getBookingHistory(@PathVariable String emailId) {

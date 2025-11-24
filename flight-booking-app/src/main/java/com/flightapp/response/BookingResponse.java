@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BookingResponse {
 	private String pnr;
-    private float totalPrice;
-    private String message;
+	private float totalPrice;
+	private String message;
 }
