@@ -1,11 +1,13 @@
 package com.flightapp.test;
 
 import com.flightapp.controller.BookingController;
+import com.flightapp.entity.Booking;
 import com.flightapp.exception.GlobalExceptionHandler;
 import com.flightapp.exception.BadRequestException;
 import com.flightapp.exception.ResourceNotFoundException;
 import com.flightapp.request.BookingRequest;
 import com.flightapp.request.PassengerRequest;
+import com.flightapp.response.BookingResponse;
 import com.flightapp.service.BookingService;
 import com.flightapp.service.PnrGeneratorService;
 
@@ -34,6 +36,72 @@ class BookingControllerTest {
 
 	@MockBean
 	private PnrGeneratorService pnrGeneratorService;
+
+	private String bookingUrl(String flightNumber) {
+		return "/api/flight/booking/" + flightNumber;
+	}
+
+	private static final String GET_TICKET = "/api/flight/ticket/";
+	private static final String CANCEL_URL = "/api/flight/booking/cancel/";
+
+	private String validBookingRequestJson = """
+			{
+			  "emailId": "nayna@gmail.com",
+			  "contactNumber": "9906543210",
+			  "numberOfSeats": 1,
+			  "passengers": [
+			    { "passengerName": "Nimish", "age": 25, "gender": "MALE", "seatNum": "A5", "mealPref": "VEG" }
+			  ]
+			}
+			""";
+
+	@Test
+	void testBookFlight_Success() {
+		BookingResponse response = new BookingResponse("PNR123", 5000.0f, "You have successfully booked the flight");
+
+		Mockito.when(bookingService.bookFlight(Mockito.anyString(), Mockito.any())).thenReturn(Mono.just(response));
+
+		webTestClient.post().uri("/api/flight/booking/AI203").contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(validBookingRequestJson).exchange().expectStatus().isCreated().expectBody().jsonPath("$.pnr")
+				.isEqualTo("PNR123").jsonPath("$.message").isEqualTo("You have successfully booked the flight");
+	}
+
+	@Test
+	void testGetTicketDetails_Success() {
+		Booking booking = new Booking();
+		booking.setPnr("TEST123");
+
+		Mockito.when(bookingService.getBookingByPnr("TEST123")).thenReturn(Mono.just(booking));
+
+		webTestClient.get().uri(GET_TICKET + "TEST123").exchange().expectStatus().isOk().expectBody().jsonPath("$.pnr")
+				.isEqualTo("TEST123");
+	}
+
+	@Test
+	void testBookFlight_FlightNotFound() {
+		Mockito.when(bookingService.bookFlight(Mockito.anyString(), Mockito.any()))
+				.thenReturn(Mono.error(new ResourceNotFoundException("Flight not found")));
+
+		webTestClient.post().uri(bookingUrl("INVALID")).contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(validBookingRequestJson).exchange().expectStatus().isNotFound().expectBody()
+				.jsonPath("$.message").isEqualTo("Flight not found");
+	}
+
+	@Test
+	void testGetTicketDetails_NotFound() {
+		Mockito.when(bookingService.getBookingByPnr("XYZ000"))
+				.thenReturn(Mono.error(new ResourceNotFoundException("not found")));
+
+		webTestClient.get().uri(GET_TICKET + "XYZ000").exchange().expectStatus().isNotFound();
+	}
+
+	@Test
+	void testCancelBooking_NotFound() {
+		Mockito.when(bookingService.cancelBooking("NOPE"))
+				.thenReturn(Mono.error(new ResourceNotFoundException("not found")));
+
+		webTestClient.delete().uri(CANCEL_URL + "NOPE").exchange().expectStatus().isNotFound();
+	}
 
 	@Test
 	void testCancelBookingSuccess() {

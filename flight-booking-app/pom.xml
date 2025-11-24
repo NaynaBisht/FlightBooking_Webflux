@@ -19,6 +19,8 @@
     <properties>
         <java.version>21</java.version>
         <sonar.organization>naynabisht</sonar.organization>
+	    <sonar.projectKey>NaynaBisht_FlightBooking_Webflux</sonar.projectKey>
+	    <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     </properties>
 
     <dependencies>
@@ -127,6 +129,12 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+			  <groupId>org.sonarsource.scanner.maven</groupId>
+			  <artifactId>sonar-maven-plugin</artifactId>
+			  <version>3.9.1.2184</version>
+			</plugin>
+
 
         </plugins>
     </build>
