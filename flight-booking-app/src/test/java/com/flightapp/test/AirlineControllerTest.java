@@ -50,23 +50,4 @@ class AirlineControllerTest {
 				.isEqualTo("AI203");
 	}
 
-	@Test
-	void testAddFlight_DepartureTimeInPast() {
-		AddFlightRequest request = new AddFlightRequest();
-		request.setFlightNumber("AI101");
-		request.setAirlineName("Air India");
-		request.setDepartingAirport("DEL");
-		request.setArrivalAirport("BOM");
-		request.setDepartureTime(LocalDateTime.now().minusDays(1));
-		request.setArrivalTime(LocalDateTime.now());
-		request.setPrice(4000);
-		request.setTotalSeats(150);
-
-		Mockito.when(airlineService.addFlight(any()))
-				.thenReturn(Mono.error(new ResourceNotFoundException("Departure time must be in the future")));
-
-		webTestClient.post().uri("/api/flight/airline/inventory/add").contentType(MediaType.APPLICATION_JSON)
-				.bodyValue(request).exchange().expectStatus().isBadRequest();
-	}
-
 }

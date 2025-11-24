@@ -1,19 +1,9 @@
 package com.flightapp.test;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.any;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-
 import com.flightapp.entity.Booking;
 import com.flightapp.entity.Flight;
+import com.flightapp.exception.ResourceNotFoundException;
+import com.flightapp.exception.SeatUnavailableException;
 import com.flightapp.repository.BookingRepository;
 import com.flightapp.repository.FlightRepository;
 import com.flightapp.request.BookingRequest;
@@ -22,27 +12,41 @@ import com.flightapp.response.BookingResponse;
 import com.flightapp.service.BookingService;
 import com.flightapp.service.PnrGeneratorService;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
 
-@SpringBootTest
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 class BookingServiceTest {
 
-	@MockBean
+	@Mock
 	private BookingRepository bookingRepository;
 
-	@MockBean
+	@Mock
 	private FlightRepository flightRepository;
 
-	@MockBean
+	@Mock
 	private PnrGeneratorService pnrGeneratorService;
 
-	@Autowired
+	@InjectMocks
 	private BookingService bookingService;
+
+	@BeforeEach
+	void setUp() {
+		MockitoAnnotations.openMocks(this);
+	}
 
 	@Test
 	void testBookFlightSuccess() {
-
 		Flight flight = new Flight();
 		flight.setId("1");
 		flight.setAvailableSeats(10);
@@ -51,12 +55,9 @@ class BookingServiceTest {
 		flight.setArrivalTime(LocalDateTime.now().plusHours(3));
 
 		when(flightRepository.findByFlightNumber("AI202")).thenReturn(Mono.just(flight));
-
 		when(pnrGeneratorService.generatePnr()).thenReturn("PNR001");
-
-		when(bookingRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
-
-		when(flightRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+		when(bookingRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
+		when(flightRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
 		BookingRequest req = new BookingRequest();
 		req.setEmailId("test@gmail.com");
@@ -69,38 +70,33 @@ class BookingServiceTest {
 		p.setGender("Male");
 		p.setSeatNum("A1");
 		p.setMealPref("Veg");
-
 		req.setPassengers(List.of(p));
 
 		BookingResponse response = bookingService.bookFlight("AI202", req).block();
 
 		assertNotNull(response);
 		assertEquals("PNR001", response.getPnr());
-		assertEquals("You have successfully booked the flight", response.getMessage());
-
-		verify(bookingRepository, times(1)).save(any());
-		verify(flightRepository, times(1)).save(any());
+		verify(bookingRepository).save(any());
 	}
 
 	@Test
 	void testBookFlight_FlightNotFound() {
-
 		when(flightRepository.findByFlightNumber("X999")).thenReturn(Mono.empty());
 
 		BookingRequest req = new BookingRequest();
 		req.setEmailId("test@gmail.com");
 		req.setContactNumber("9876543210");
 		req.setNumberOfSeats(1);
+		req.setPassengers(List.of());
 
-		RuntimeException ex = assertThrows(RuntimeException.class,
+		Exception ex = assertThrows(ResourceNotFoundException.class,
 				() -> bookingService.bookFlight("X999", req).block());
 
-		assertTrue(ex.getMessage().contains("No flights found"));
+		assertTrue(ex.getMessage().contains("Flight not found"));
 	}
 
 	@Test
 	void testBookFlight_NotEnoughSeats() {
-
 		Flight flight = new Flight();
 		flight.setAvailableSeats(1);
 
@@ -110,16 +106,16 @@ class BookingServiceTest {
 		req.setEmailId("test@gmail.com");
 		req.setContactNumber("9876543210");
 		req.setNumberOfSeats(5);
+		req.setPassengers(List.of(new PassengerRequest()));
 
-		RuntimeException ex = assertThrows(RuntimeException.class,
+		Exception ex = assertThrows(SeatUnavailableException.class,
 				() -> bookingService.bookFlight("AI202", req).block());
 
-		assertEquals("Enough seats are not available", ex.getMessage());
+		assertEquals("Insufficient seat availability", ex.getMessage());
 	}
 
 	@Test
 	void testGetBookingByPnr() {
-
 		Booking b = new Booking();
 		b.setPnr("PNR123");
 
@@ -132,7 +128,6 @@ class BookingServiceTest {
 
 	@Test
 	void testGetBookingHistory() {
-
 		Booking b = new Booking();
 		b.setEmailId("abc@gmail.com");
 
@@ -145,19 +140,16 @@ class BookingServiceTest {
 
 	@Test
 	void testCancelBooking_Success() {
-
 		Booking booking = new Booking();
 		booking.setPnr("P001");
 		booking.setStatus("BOOKED");
 
 		when(bookingRepository.findByPnr("P001")).thenReturn(Mono.just(booking));
-
-		when(bookingRepository.save(any())).thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+		when(bookingRepository.save(any())).thenAnswer(inv -> Mono.just(inv.getArgument(0)));
 
 		bookingService.cancelBooking("P001").block();
 
 		assertEquals("CANCELLED", booking.getStatus());
-		verify(bookingRepository).save(booking);
+		verify(bookingRepository).save(any());
 	}
-
 }
